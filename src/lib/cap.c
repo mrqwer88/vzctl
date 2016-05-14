@@ -19,6 +19,7 @@
 #include <linux/unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -170,6 +171,7 @@ void build_cap_str(cap_param *new, cap_param *old, const char *delim,
 		char *buf, int len)
 {
 	unsigned int i;
+	unsigned int j = 0;
 	int r;
 	char *sp, *ep;
 
@@ -191,13 +193,85 @@ void build_cap_str(cap_param *new, cap_param *old, const char *delim,
 		else
 			continue;
 		r = snprintf(sp, ep - sp, "%s%s:%s",
-				i == 0 ? "" : delim,
+				j++ == 0 ? "" : delim,
 				cap_names[i],
 				op == 1 ? "on" : "off");
 		if (r < 0 || sp + r >= ep)
 			break;
 		sp += r;
 	}
+}
+
+/** only retrun in string format for output.
+ *
+ * @param cap		capability mask.
+ * @param buf		merged capabilities in string format.
+ * @param len		max size of buf string.
+ */
+void cap_param2str(cap_param *cap, const char *delim,
+		char *buf, int len)
+{
+	unsigned int i;
+	unsigned int j = 0;
+	int r;
+	char *sp, *ep;
+	
+	unsigned int l = 0;
+	char lc[64] = "\0";
+
+	sp = buf;
+	ep = buf + len;
+	for (i = 0; i < ARRAY_SIZE(cap_names); i++) {
+		int op = 0;
+
+		if (CAP_TO_MASK(i) & cap->on)
+			op = 1;
+		else if (CAP_TO_MASK(i) & cap->off)
+			op = 2;
+		else
+			continue;
+		for (l=0; cap_names[i][l]; l++)
+			lc[l] = tolower(cap_names[i][l]);
+
+		r = snprintf(sp, ep - sp, "%s%s:%s",
+				j++ == 0 ? "" : delim,
+				lc,
+				op == 1 ? "on" : "off");
+		if (r < 0 || sp + r >= ep)
+			break;
+		sp += r;
+	}
+}
+
+void print_json_cap(cap_param *cap)
+{
+	unsigned int i, j = 0;
+	unsigned int l = 0;
+	char lc[64] = "\0";
+
+	for (i = 0; i < ARRAY_SIZE(cap_names); i++) {
+		int op = 0;
+
+		if (CAP_TO_MASK(i) & cap->on)
+			op = 1;
+		else if (CAP_TO_MASK(i) & cap->off)
+			op = 2;
+		else
+			continue;
+
+		for (l=0; cap_names[i][l]; l++)
+			lc[l] = tolower(cap_names[i][l]);
+
+		printf("%s      \"%s\": %s",
+				j++ == 0 ? "{\n" : ",\n",
+				lc,
+				op ? "true" : "false");
+	}
+
+	if (j)
+		printf("\n    }");
+	else
+		printf("null");
 }
 
 static int set_cap_bound(cap_t mask)

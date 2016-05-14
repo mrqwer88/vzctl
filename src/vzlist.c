@@ -407,7 +407,19 @@ static void print_netfilter(struct Cveinfo *p, int index)
 		print_json_str(netfilter_mask2str(p->nf_mask));
 	else
 		p_buf += snprintf(p_buf, e_buf - p_buf,
-				"%-6s",	netfilter_mask2str(p->nf_mask));
+				"%-15s",	netfilter_mask2str(p->nf_mask));
+}
+
+static void print_capability(struct Cveinfo *p, int index)
+{
+	if (fmt_json)
+		return print_json_cap(&p->cap);
+
+	char buf[STR_SIZE] = "-";
+	//build_cap_str(&p->cap, &p->cap, ",", buf, sizeof(buf));
+	cap_param2str(&p->cap, ",", buf, sizeof(buf));
+		p_buf += snprintf(p_buf, e_buf - p_buf,
+				"%-15s", buf);
 }
 
 static void print_features(struct Cveinfo *p, int index)
@@ -780,6 +792,7 @@ UBC_FIELD(swappages, SWAPP),
 {"vm_overcommit", "VM_OVC", "%6s", 0, RES_NONE,
 	print_vm_overcommit, none_sort_fn},
 {"netfilter", "NETFILTER", "%-15s", 0, RES_NONE, print_netfilter, none_sort_fn},
+{"capability", "CAPABILITY", "%-15s", 0, RES_NONE, print_capability, none_sort_fn},
 };
 
 static void *x_malloc(int size)
@@ -1165,6 +1178,7 @@ FOR_ALL_UBC(MERGE_UBC)
 		ve->origin_sample = strdup(opt->origin_sample);
 	ve->layout = res->fs.layout;
 	ve->nf_mask = res->env.nf_mask;
+	ve->cap = res->cap;
 }
 
 static int read_ves_param()
