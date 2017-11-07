@@ -916,7 +916,7 @@ static int wait_child(int pid, int ignore_kill)
 static int env_stop(vps_handler *h, envid_t veid, const char *root,
 		int stop_mode, int timeout)
 {
-	int i, pid, ret, tout = 0;
+	int i, pid, child_pid, kill_pid, ret, tout = 0;
 
 	if (timeout <= 0)
 		timeout = DEF_STOP_TIMEOUT;
@@ -934,16 +934,48 @@ static int env_stop(vps_handler *h, envid_t veid, const char *root,
 		goto out;
 	}
 	logger(0, 0, "Stopping container ...");
-	if ((pid = fork()) < 0) {
+	if ((child_pid = fork()) < 0) {
 		logger(-1, errno, "Can not fork");
 		ret = VZ_RESOURCE_ERROR;
 		goto out;
-	} else if (pid == 0) {
-		ret = real_env_stop(h, veid, root, stop_mode);
+	} else if (child_pid == 0) {
+		if ((pid = fork()) < 0) {
+			logger(-1, errno, "Can not fork");
+			ret = VZ_RESOURCE_ERROR;
+			goto out;
+		} else if ( pid == 0 ) {
+			ret = real_env_stop(h, veid, root, stop_mode);
+			exit(ret);
+		}
+		// If vps correctly stopped - exit
+		for (i = 0; i < timeout; i++) {
+			sleep(1);
+			if (!vps_is_run(h, veid)) {
+				ret = 0;
+				exit(ret);
+			}
+		}
+		// kill by timeout
+		logger(-1, 0, "CT stopping was timed out. Trying to force kill CT.");
+		logger(0, 0, "Killing container ...");
+		ret = h->destroy(h, veid);
+		if (!is_vz_kernel(h))
+			goto wait;
+
+		if ((kill_pid = fork()) < 0) {
+			ret = VZ_RESOURCE_ERROR;
+			logger(-1, errno, "Can not fork");
+			goto out;
+
+		} else if (kill_pid == 0) {
+			ret = real_env_stop(h, veid, root, M_KILL);
+			exit(ret);
+		}
+		ret = wait_child(kill_pid, 1);
 		exit(ret);
 	}
 
-	ret = wait_child(pid, 0);
+	ret = wait_child(child_pid, 0);
 	/* Sometimes reboot/halt returns 1 but still stops the CT */
 	if (ret != 0 && ret != 1) /* failed, retry with kill */
 		goto kill_vps;
@@ -962,16 +994,16 @@ kill_vps:
 	if (!is_vz_kernel(h))
 		goto wait;
 
-	if ((pid = fork()) < 0) {
+	if ((child_pid = fork()) < 0) {
 		ret = VZ_RESOURCE_ERROR;
 		logger(-1, errno, "Can not fork");
 		goto out;
 
-	} else if (pid == 0) {
+	} else if (child_pid == 0) {
 		ret = real_env_stop(h, veid, root, M_KILL);
 		exit(ret);
 	}
-	ret = wait_child(pid, 1);
+	ret = wait_child(child_pid, 1);
 	if (ret)
 		goto out;
 
