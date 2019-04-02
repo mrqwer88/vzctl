@@ -54,6 +54,10 @@ create_prvt()
 		vzerror "Failed to get available disk space on $VE_PRVT" ${VZ_FS_NEW_VE_PRVT}
 
 	case $HEADER in
+		' 28 b5') # zstd
+			OPT=""
+			TAR_OPT="--use-compress-program=zstd ${TAR_OPT}"
+			;;
 		' 1f 8b') # gzip
 			OPT=-z
 			# Use pigz for more fast uncompress template if we can

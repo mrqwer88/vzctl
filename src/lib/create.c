@@ -158,8 +158,8 @@ static int fs_create(envid_t veid, vps_handler *h, vps_param *vps_p)
 	int quota = 0;
 	int i;
 	char *untar_to;
-	const char *ext[] = { "", ".gz", ".bz2", ".xz", NULL };
-	const char *errmsg_ext = "[.gz|.bz2|.xz]";
+	const char *ext[] = { "", ".zst", ".gz", ".bz2", ".xz", NULL };
+	const char *errmsg_ext = "[.zst|.gz|.bz2|.xz]";
 	dq_param *dq = &vps_p->res.dq;
 	fs_param *fs = &vps_p->res.fs;
 	tmpl_param *tmpl = &vps_p->res.tmpl;
